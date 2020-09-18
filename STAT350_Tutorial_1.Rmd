@@ -1,0 +1,218 @@
+---
+title: "STAT350 Tutorial 1"
+# author: "Dylan Maciel"
+date: "11/09/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+For this course we will be using R to implement the concepts learned in class.
+This tutorial covers downloading and installing R and RStudio for Mac and 
+Windows. Then we'll go over some basic R commands and do an example simple
+linear regression on a data set.
+
+
+# Installing R and RStudio
+
+
+R is a free open-source software used for statistical computing; the current 
+version is 4.0.2. You can code directly in the program, but using an IDE like
+RStudio, which is also free, allows you to write more than one line at a time
+and integrates many other useful tools that make using R more efficient. 
+
+The order in which you install these programs is important. For Mac users you'll
+have to download and install [XQuartz](https://www.xquartz.org/) first. Then, 
+for both Windows and Mac install [R](https://mirror.rcg.sfu.ca/mirror/CRAN/) 
+before you install [RStudio](https://rstudio.com/products/rstudio/download/).
+For RStudio you'll want to download the free version of RStudio Desktop. I
+recommend keeping all the defaults when installing these programs. If done in
+the proper order, when you first open RStudio it will detect R on your computer
+and start the R console itself.
+
+For a more in-depth introduction to R and Rstudio I recommend reading through 
+sections 1 to 4 of [A (very) short introduction to R](https://cran.r-project.org/doc/contrib/Torfs+Brauer-Short-R-Intro.pdf) 
+by Torfs and Brauer. It also goes through installation, but will also introduce 
+you to some basic R functions and uses of RStudio.
+
+If you have any troubles with these installations, I will be holding online 
+office hours over zoom next week on Tuesday at 5pm and Wednesday at 10 am. I can 
+also answer any other R questions you may have.
+
+
+# An Initial Example
+
+In what follows I will briefly go over reading in data and fitting a simple 
+linear regression model. To get the most out of this example I would open a new
+R script in RStudio and go through the code below. Copy the code, make sure you 
+can get it working on your computer and try to understand what each line is 
+doing.
+
+## Data Entry
+
+Typically, we use data from external files in R. The function to read in data 
+from an ".csv" or excel file is \verb|read.csv|. This file can either be located 
+on you local disk or we can read a file directly from the internet as seen below
+. 
+
+```{r}
+forbes_data <- read.csv(file = "http://users.stat.umn.edu/~sandy/alr4ed/data/Forbes.csv",
+                        header = TRUE,
+                        sep = ',',
+                        row.names = 1)
+```
+
+This function has many input. The first input \verb|file| tells R the name of 
+file containing the dataset. If this file was on your computer the way to ensure 
+that R can find the file is to put the whole path to the file within the quotes. 
+
+We set the \verb|header| input to \verb|TRUE| if the first row of the dataset 
+contains variable names, otherwise it should be set to \verb|FALSE|. If this is 
+not explicitly set it will default to \verb|TRUE|.
+
+The \verb|sep| input tells the function how the columns of data are separated
+within the file. It's default value is \verb|','|.
+
+The \verb|row.names| input names can be used to specify the column number that 
+contains the row names. Many data sets do not have row names, for those this 
+input does not need to be specified.
+
+Here I have saved the data to the object named \verb|forbes_data|. Now anytime I 
+want to work with this specific dataset I just need to call it by that name. The
+name you choose for the dataset is important and should be informative.
+
+
+## Looking at the data.
+
+We can look at the first few rows of the data using the \verb|head()| function.
+
+```{r} 
+head(forbes_data)
+```
+
+So, we see that the dataset contains three variable; \verb|bp|, \verb|pres|, and
+\verb|lpres|. Before fitting a model to the data it is good practice to 
+do some initial data analysis. This is done to ensure the data looks the way we 
+expect it to look. If the data has mistakes or missing values they could
+negatively impact the performance of our model in the end. Datasets used in
+tutorials will be clean and ready for analysis, but you should keep this in mind 
+in your future work.
+
+We can get univariate numerical summaries of the data using the \verb|summary()| 
+function.
+
+```{r}
+summary(forbes_data)
+```
+
+We can also make graphical summaries. Below, I use the \verb|boxplot()| function 
+to create a boxplot for each variable.
+
+```{r}
+boxplot(forbes_data,
+        main = 'Boxplot of forbes_data')
+```
+
+```{r}
+hist(forbes_data$lpres)
+```
+
+
+## Simple Linear Regression
+
+For our example \verb|lpres| will be the response and \verb|bp| will be the 
+predictor. First we'll create a basic scatter plot of the data using the
+\verb|plot()| function.
+
+```{r}
+plot(formula = lpres ~ bp,
+     data = forbes_data,
+     main = "lpres vs. bp",
+     xlab = "bp",
+     ylab = "lpres")
+```
+
+The first input, \verb|formula|, tells R how to arrange the data on the plot. 
+The response goes to the left of the \verb|~| and the predictor to the right.
+The next argument tells R where the data is located. This is followed by 
+arguments that let us set the main title, x-axis label, and y-axis label, 
+respectively. There are other arguments to this function that let us further 
+customize how we want the plot to look.
+
+Looking at the plot, we see that a linear regression model would be suitable for
+this data and can proceed with creating the model.
+
+In R we use the function \verb|lm()| to fit linear regression models. The first 
+two arguments for this function follow the same format that we used in the
+\verb|plot()| function above.
+
+
+```{r}
+my_mdl <- lm(formula = lpres ~ bp, 
+             data = forbes_data)
+```
+
+
+Here I have saved the resulting object from using this command to the name 
+\verb|my_mdl|. If we want brief summary of the model we can call it by
+name. 
+
+```{r}
+my_mdl
+```
+
+With this we see how the linear model was defined, but more importantly we get 
+the  estimated coefficients of the model. Here the estimated intercept is
+`r round(my_mdl$coefficients[1], 3)` and the estimated slope is 
+`r round(my_mdl$coefficients[2], 3)`. If we want to extract the coefficient 
+values from the model object we use \verb|$| followed by the name.
+
+```{r}
+my_mdl$coefficients
+```
+
+To get a single value, we then add the index within square brackets to the code
+above. If we want the intercept, it's the first element and therefore indexed
+by 1.
+
+
+```{r}
+my_mdl$coefficients[1]
+```
+
+We can get a more elaborate summary of the model we can use the \verb|summary()|
+function on the model object. 
+
+```{r}
+summary(my_mdl)
+```
+
+The added information here will be useful in the coming weeks when we cover 
+confidence intervals, hypothesis tests, and assessing the model.
+
+
+Now that the model is fit we can add the regression line to the scatter plot of
+the data. This is done with the function \verb|abline()| whose input \verb|reg|
+is the model object defined above. Alternatively, we could also manually set the 
+regression line values using the input \verb|a| for the intercept and \verb|b| 
+for the slope. This function places a straight line over top of a scatter plot
+and should therefore be called after the \verb|plot()| function. Here I've also 
+included the argument \verb|col| to specify the colour of the line. 
+
+```{r}
+plot(formula = lpres ~ bp,
+     data = forbes_data,
+     main = 'lpres vs. bp',
+     xlab = 'bp',
+     ylab = 'lpres')
+
+abline(reg = my_mdl, 
+       col = 'red')
+```
+
+
+

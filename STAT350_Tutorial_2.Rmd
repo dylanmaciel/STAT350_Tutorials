@@ -1,0 +1,270 @@
+---
+title: "STAT350 Tutorial 2"
+# author: "Dylan Maciel"
+date: "15/09/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+This weeks tutorial covers hypothesis tests and interval estimation for the 
+parameters of the simple linear regression (SLR) model, along with prediction of
+new observations and the coefficient of determination. 
+
+We continue with the example from last tutorial where we used the Forbes data to
+create a SLR with \verb|lpres| as the dependent variable and \verb|bp| as the 
+independent variable. The model call and plot of the data with the fit 
+regression line are below. 
+
+```{r echo=FALSE}
+forbes_data <- read.csv(file = "http://users.stat.umn.edu/~sandy/alr4ed/data/Forbes.csv",
+                        header = TRUE,
+                        sep = ',',
+                        row.names = 1)
+
+my_mdl <- lm(formula = lpres ~ bp, 
+             data = forbes_data)
+
+my_mdl
+```
+
+
+```{r echo=FALSE, fig.height=4, fig.width=7}
+plot(formula = lpres ~ bp,
+     data = forbes_data,
+     main = 'lpres vs. bp',
+     xlab = 'bp',
+     ylab = 'lpres')
+
+abline(reg = my_mdl, 
+       col = 'red')
+```
+
+
+\newpage
+
+I'm also going to save the model summary object to \verb|my_sum|.
+```{r}
+my_sum <- summary(my_mdl)
+my_sum
+```
+The model and summary objects contain many parts. If you want more information 
+about these you can run \verb|help(lm)| or \verb|help(summary.lm)|,
+respectively. The \verb|help()| function is generally useful if you are confused
+with any other function you are using in R.
+
+
+\subsection*{Hypothesis Test for the $\beta$s}
+
+Typically we are interested in testing whether or not a parameter should be 
+included in the model. Here we'll consider the slope. The hypothesis for this 
+is:
+\begin{align*}
+        \text{H}_0: \ \beta_1=0 \ \ \text{vs.} \ \ \text{H}_A: \beta_1 \neq 0.
+\end{align*}
+To test this we'll go through same procedure as other hypothesis test you've 
+come across; compute the test statistic based on the data, find its
+corresponding p-value, then compare to $\alpha$.
+
+Here we'll be doing a t-test where the test statistic is given by:
+\begin{align*}
+        t = \frac{\hat{\beta}_1}{se(\hat{\beta}_1)}.
+\end{align*}
+After calculating this value, we could then compute the corresponding p-value 
+with the \verb|pt()|, specifying the correct degrees of freedom.
+
+Luckily for us, all values we need can be found in the summary:
+
+```{r}
+my_sum$coefficients
+```
+For the slope (the coefficient for \verb|bp|) we look at the second row. Here we
+see the estimated slope is `r round(my_sum$coefficients[2,1],3)` and has an 
+estimated standard error of `r round(my_sum$coefficients[2,2],3)`. The 
+corresponding t-value is `r round(my_sum$coefficients[2,3],3)` and p-value 
+`r round(my_sum$coefficients[2,4],3)`. The p-value is extremely small, so for 
+any reasonable value of $\alpha$ we'll reject the null hypothesis.
+
+Other hypothesis tests for the coefficients such as a two-sided test if $\beta$
+equals a specific value or one-sided tests for checking if $\beta$ is less than
+or greater than some value can also be performed. For these we perform a t-test
+as well, but the test statistic is slightly different:
+\begin{align*}
+        t = \frac{\hat{\beta}_1 - \beta_1}{se(\hat{\beta}_1)}.
+\end{align*}
+So we can't just pull the t- and p-values from the summary object, though their 
+computation is relatively straight forward using the estimate and its standard
+error.
+
+A side note: in the context of SLR the F-statistic seen in the summary
+```{r}
+my_sum$fstatistic
+```
+is just the squared t-value for the estimate of the slope. 
+```{r}
+my_sum$coefficients[2,3]^2
+```
+We can therefore test the same two-sided hypothesis as above, but now with an 
+analysis-of-variance F-test. This test will be more useful when we cover 
+multiple linear regression.
+
+
+\subsection*{Intervals for the $\beta$s}
+
+A $100(1-\alpha)$ percent confidence interval (CI) on a given coefficient is 
+given by
+\begin{align*}
+        \hat{\beta} - t_{\alpha/2,n-2}se(\hat{\beta}) \leq \beta \leq
+        \hat{\beta} + t_{\alpha/2,n-2}se(\hat{\beta}).
+\end{align*}
+
+
+First, we assign the estimated coefficients and their standard errors to their 
+own objects.
+```{r}
+beta_hat <- my_sum$coefficients[,1]
+beta_ses <- my_sum$coefficients[,2]
+```
+
+Next, we can compute the critical t-value. Here we'll be computing a 95\% CI, 
+so the t-value we are looking corresponds to the probability $1-(0.05/2)$. For
+the degrees of freedom, we can get it from the model object.
+```{r}
+(tval <- qt(p = 0.975, df = my_mdl$df))
+```
+
+Now we have all the values we need and can compute the CI by applying
+the formula above. 
+```{r}
+(CIs <- data.frame(estimate = beta_hat,
+                   lower = beta_hat - tval*beta_ses,
+                   upper = beta_hat + tval*beta_ses))
+```
+
+Interpretation of confidence intervals is important and regularly confused by 
+students. For a 95\% confidence interval on $\beta$, we say that for each sample
+of data and CI computed in this way, 95\% of the CIs will contain the true value
+of $\beta$.
+
+\subsection*{Interval for $\sigma^2$}
+
+
+The estimate for $\sigma^2$ is not readily available from either the model or
+summary objects, but we can quickly compute it. First we can compute the 
+residual sum of squares:
+```{r}
+(SS_res <- sum(my_mdl$residuals^2))
+```
+Then divide that by the degrees of freedom:
+```{r}
+(sigma2_hat <- SS_res/my_mdl$df.residual)
+```
+
+So we have an estimated model variance of `r round(sigma2_hat, 3)`. To compute 
+a CI for the parameter we use:
+\begin{align*}
+        \frac{(n-2)\hat{\sigma}^2}{\chi^2_{\alpha/2, n-2}} \leq \sigma^2 \leq
+        \frac{(n-2)\hat{\sigma}^2}{\chi^2_{1-\alpha/2, n-2}}
+\end{align*}
+
+For a 95\% CI we set $\alpha$ to 0.05 and our two $\chi^2$-values are: 
+```{r}
+(chi_up <- qchisq(0.975, my_mdl$df.residual))
+(chi_low <- qchisq(0.025, my_mdl$df.residual))
+```
+
+Finally, we have the confidence inter val for $\sigma^2$:
+```{r}
+(CI_sigma <- data.frame(estimate = sigma2_hat,
+                        lower = my_mdl$df.residual*sigma2_hat/chi_low,
+                        upper = my_mdl$df.residual*sigma2_hat/chi_up))
+```
+
+
+
+
+\subsection*{Prediction}
+
+
+Given our fitted SLR model we can make predictions for new values of \verb|bp|. 
+When making predictions we want to avoid extrapolation, so I'll first check the
+range of \verb|bp| values.
+```{r}
+range(forbes_data$bp)
+```
+We'll make a prediction at \verb|bp = 207|.
+
+We make predictions with the \verb|predict()| function. The first input is the
+model object. We the specify the new predictor value in \verb|newdata|; the 
+format here is important as the function needs a data frame with the same
+variables that defined the initial model.
+```{r}
+predict(my_mdl, newdata = data.frame(bp = 207))
+```
+If we were to omit the \verb|newdata| argument the function returns the fitted
+values.
+```{r}
+predict(my_mdl)
+```
+
+The predict function can also give us intervals for our predictions through the 
+\verb|interval| argument. We have three choices: \verb|'none'| (the default), 
+\verb|'confidence'|, or \verb|'prediction'|. The default level for the intervals 
+is 95\%, but this can be changed with the \verb|level| argument
+
+
+Below We use \verb|'confidence'| to obtain a 95\% confidence interval for the 
+mean response.
+```{r}
+(conf_int <- predict(my_mdl, 
+                     newdata = data.frame(bp = 207),
+                     interval = 'confidence'))
+```
+
+We use \verb|'prediction'| if we want a prediction interval.
+```{r}
+(pred_int <- predict(my_mdl, 
+                     newdata = data.frame(bp = 207), 
+                     interval = 'prediction'))
+```
+As we can see the prediction interval is wider than the confidence interval, 
+why? The confidence interval is for a parameter, in this case we are interested 
+in the mean of the response values for a particular value of the independent
+variable. The prediction interval gives us the range for the observed value of
+the response, so there is more uncertainty here as we need to consider 
+$\epsilon$ in it's calculation.
+
+
+
+
+
+\subsection*{Coeffecient of Determination, $R^2$}
+
+The coefficient of determination is also part of the summary object.
+```{r}
+my_sum$r.squared
+```
+Also called the proportion of variance explained, it is a measure of how well 
+our model performs. As you will see it is the ratio of the variation in the 
+residuals to the variation in the response. Therefore $0\leq R^2\leq$. Values 
+close to 1 mean we've explained most of the variability - our model performs 
+well.
+
+For SLR, it turns out that $R^2$ is just the squared correlation between the two
+variables.
+```{r}
+cor(forbes_data$bp, forbes_data$lpres)^2
+```
+
+The summary also contains something called the adjusted $R^2$.
+```{r}
+my_sum$adj.r.squared
+```
+This is a function of the $R^2$ and the sample size. Just ignore it for now.
+
+
