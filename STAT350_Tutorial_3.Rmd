@@ -1,0 +1,266 @@
+---
+title: "STAT350 Tutorial 3"
+# author: "Dylan Maciel"
+date: "22/09/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+The tutorial this week will be similar to the one from last. The difference now
+is that we include multiple regressors in our linear regression model.
+
+
+\subsection*{The Data}
+
+For this weeks tutorial we'll be using the auto-mpg dataset. The goal is to
+predict the miles per gallon (mpg) of a vehicle given other measurements for the 
+vehicle such as the number of cylinders (cyl), engine displacement (disp), 
+horsepower (hp), weight of the vehicle (wt), acceleration (acc), and model year 
+(year).
+
+This dataset does not include a header so we'll have to add variable names 
+ourselves.
+
+```{r}
+auto_mpg <- read.table(paste('https://archive.ics.uci.edu/ml/',
+                             'machine-learning-databases/auto-mpg/auto-mpg.data',
+                             sep = ''))
+
+colnames(auto_mpg) = c("mpg", "cyl", "disp", "hp", "wt", "acc",
+                       "year", "origin", "name")
+
+head(auto_mpg)
+```
+
+\newpage
+
+Below I use the \verb|str()| function to check structure of the data. Making 
+sure variables are formatted properly.
+```{r}
+str(auto_mpg)
+```
+
+So, we'll remove the second column and last three columns as we're currently 
+only concerned with continuous predictors for a continuous response. Then we'll 
+remove observations where hp="?" and change hp from a character to a numeric 
+variable.
+
+```{r}
+auto_mpg <- auto_mpg[,-c(2, 7, 8, 9)]
+auto_mpg <- subset(auto_mpg, auto_mpg$hp != "?")
+auto_mpg$hp <- as.numeric(auto_mpg$hp)
+```
+
+
+Next, we'll visualize the data with a scatter plot matrix using the
+\verb|pairs()| function.
+```{r}
+pairs(auto_mpg)
+```
+With this plot we can tell quite a bit about the relationship between variables 
+in the dataset. Mainly, we see that a linear regression model seems appropriate. 
+Another thing to take notice of is the multicollinearity present among the 
+explanatory variables something we'll address in the coming weeks.
+
+\section*{Multiple Linear Regression}
+
+To keep things simple, we'll have a model with only two predictors; wt and hp.
+So, our regression model equation will be:
+\begin{align*}
+  mpg = \beta_0 + \beta_1(wt) + \beta_2(hp) + \epsilon
+\end{align*}
+
+
+\subsection*{Fitting the Model}
+
+
+I now fit the model using the \verb|lm()| function. This is the same as we've
+done before, where the response is on the left of the \verb|~| and the 
+predictors are on the right. 
+```{r}
+mdl <- lm(mpg ~ wt + hp, data = auto_mpg)
+(mdl_sum <- summary(mdl))
+```
+
+We could also compute the value of the coefficients directly from the data using
+the least squares equation:
+\begin{align*}
+  \hat{\boldsymbol{\beta}} = (\boldsymbol{X}'\boldsymbol{X})^{-1}
+                              \boldsymbol{X}'\boldsymbol{y}.
+\end{align*}
+Here I use the functions \verb|solve()| and \verb|t()| to find the inverse and 
+transpose of the design matrix $\boldsymbol{X}$, respectively. Making sure that
+the first column of $\boldsymbol{X}$ is a column of $1$s.
+```{r}
+X <- cbind(rep(1, nrow(auto_mpg)), auto_mpg$wt, auto_mpg$hp)
+
+solve(t(X) %*% X) %*% t(X) %*% auto_mpg$mpg
+```
+
+
+\subsection*{Hypothesis Tests}
+
+\subsubsection{Hypothesis Test for a Single $\beta_j$}
+
+Conducting hypothesis tests for a single $\beta_j$ is in practice the same as
+simple linear regression, the difference is how we interpret the test. Since 
+there are other regressors in the model we are doing a marginal test. That is, 
+if we test the following hypothesis:
+\begin{align*}
+        H_0: \ \beta_j=0 \ \ \text{vs.} \ \ \text{H}_A: \beta_j \neq 0,
+\end{align*}
+with $j=1$, we are testing if there is a relationship between wt and mpg given 
+that hp is included in the model. So, another way of stating the hypothesis is 
+through the model equation:
+\begin{align*}
+  &H_o: \ mpg = \beta_0 + \beta_2(hp) + \epsilon \\
+  &\text{vs.} \\
+  &H_A: \ mpg = \beta_0 + \beta_1(wt) + \beta_2(hp) + \epsilon
+\end{align*}
+
+The test statistic for this hypothesis is given by:
+\begin{align*}
+        t = \frac{\hat{\beta}_j}{se(\hat{\beta}_j)}.
+\end{align*}
+Once this is computed, we find the corresponding p-value and compare to some
+level $\alpha$.
+
+Like before all the information we need to conduct the above hypothesis test is
+contained in the coefficients object of the model summary.
+```{r}
+mdl_sum$coefficients
+```
+
+So, for our hypothesis test on the coefficient for wt we have a p-value that is 
+practically zero. We therefore reject the null hypothesis that wt should not be 
+included in our linear model for mpg, given that hp is in the model.
+
+
+\subsubsection{Hypothesis Test for Significance of Regression}
+
+Another hypothesis test we can do an ANOVA F-test for the significance of 
+regression. Testing to see if there is a significant linear relationship between 
+at least one of the predictors and the response, i.e. if all the coefficients
+are simultaneously zero;
+\begin{align*}
+  &H_o: \ \beta_1 = \beta_2 = \ldots = \beta_k = 0\\
+  &\text{vs.} \\
+  &H_A: \  \beta_j \neq 0 \ \text{for at least one $j$.}
+\end{align*}
+
+The test statistic for this hypothesis is given by:
+\begin{align*}
+  F_0 = \frac{MS_R}{MS_{Res}}
+\end{align*}
+
+Like with all hypothesis tests once the test statistic is computed, we find the
+p-value and compare it to $\alpha$. Again, this information is all contained in
+the model summary object. However, although the p-value is shown in the output 
+it is not readily accessible.
+```{r}
+(fstat <- mdl_sum$fstatistic)
+```
+If we want to access the p-value we'll have to compute it ourselves.
+```{r}
+pf(fstat[1], fstat[2], fstat[3], lower.tail = FALSE)
+```
+So, our p-value for the test of significance of regression is extremely small. 
+We therefore reject the null hypothesis and conclude that at least one of the 
+coefficients is not equal to zero.
+
+
+Another way of interpreting the significance of regression hypothesis is that we
+are comparing the null model (the model with no regressors included) to the full 
+model (the model with all regressors included). Performing an analysis of
+variance to test to see if there is a significant difference between the two 
+models. To do this We can fit the null model using \verb|lm()| and compare it to 
+the full model using the \verb|anova()| function.
+
+```{r}
+null_mdl <- lm(mpg ~ 1, data = auto_mpg)
+anova(null_mdl, mdl)
+```
+The output here more closely resembles the ANOVA table you're familiar with. 
+And, we see that this way of performing the significance of regression test
+comes to the same conclusion as before.
+
+The useful thing about performing the test this way is that we are not 
+constricted to just comparing the null and the full models. We can compare other
+subsets of the full model (aka nested models). For example, we can test to see 
+if there is a significant difference between the model with just wt as a 
+predictor and the full model with both wt and hp included. The hypothesis
+becomes:
+\begin{align*}
+  &H_0: \ \beta_2 = 0 \\
+  &\text{vs.} \\
+  &H_A: \ \beta_2 \neq 0
+\end{align*}
+
+The F-statistic for this test is similar in form to the one above, only the 
+calculation of $MS_R$ will change to be sum of squared the differences between 
+the predictions for the two model. I now perform the test, first fitting the SLR
+with just wt as a predictor, then performing the ANOVA with the full model.
+```{r}
+wt_mdl <- lm(mpg ~ wt, data = auto_mpg)
+anova(wt_mdl, mdl)
+```
+Here we again reject the null hypothesis, concluding that the coefficient for hp
+is not zero.
+
+\subsection*{Confidence Intervals}
+
+
+\subsubsection*{Confiden Intervals for $\beta_j$}
+
+In the last tutorial I showed how to create confidence interval directly, using
+g quantities found in the model summary object. This week we'll be using the
+\verb|confint()| function. The equation follows the familiar form confidence 
+intervals - the estimate plus/minus the margin of error. Where the margin of 
+error is the critical value of the t-distribution on $n-p$ degrees of freedom 
+times the standard error of the coefficient estimate.
+
+
+Below I calculate a 90\% confidence interval for the the coefficients in our 
+full model.
+```{r}
+confint(mdl, level = 0.9)
+```
+
+
+\subsection*{Prediction}
+
+Preforming prediction and computing intervals for predictions are are again 
+essentially the same as for SLR. Remember to avoid extrapolation - this a little 
+more tricky when dealing with more than one predictor. 
+
+Below I compute predictions along with a 90\% prediction interval for a single
+new data point.
+```{r}
+x_new <- data.frame(wt = 2500, hp = 150)
+
+predict(mdl, newdata = x_new, interval = 'prediction', level = 0.9)
+```
+
+
+\subsection*{Coefficient of Determination}
+
+$R^2$ for multiple linear regression has the same interpretation as in SLR.
+However, now the adjusted $R^2$ is relevant, whose value is given by:
+\begin{align*}
+  R^2_{adj} = 1 - (1 - R^2)\frac{n-1}{n-p-1}.
+\end{align*}
+Here we see that there is a penalization for including more terms in the model 
+that do not add much to the model in terms of explaining the variance found in
+the response.
+
+```{r}
+c(mdl_sum$r.squared, mdl_sum$adj.r.squared)
+```
+Here we see that the value does not change too much since, as we found in
+previous sections, both terms is our model are significant predictors of the
+response.
