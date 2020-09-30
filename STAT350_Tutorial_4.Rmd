@@ -1,0 +1,275 @@
+---
+title: "STAT350 Tutorial 4"
+# author: "Dylan Maciel"
+date: "22/09/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+In this weeks tutorial we'll be going over some issues that can arise when 
+performing multiple linear regression, followed by assessment of the model. 
+
+We're going to be using the same dataset as last week, but I'll add some 
+complexity to the model by including disp as a predictor. I've fit the 
+model and printed out the model summary below.
+
+```{r, echo = FALSE}
+auto_mpg <- read.table(paste('https://archive.ics.uci.edu/ml/',
+                             'machine-learning-databases/auto-mpg/auto-mpg.data',
+                             sep = ''))
+
+colnames(auto_mpg) = c("mpg", "cyl", "disp", "hp", "wt", "acc",
+                       "year", "origin", "name")
+
+auto_mpg <- auto_mpg[,-c(2, 7, 8, 9)]
+auto_mpg <- subset(auto_mpg, auto_mpg$hp != "?")
+auto_mpg$hp <- as.numeric(auto_mpg$hp)
+```
+
+```{r}
+mdl <- lm(mpg ~ wt + hp + disp, data = auto_mpg)
+(mdl_sum <- summary(mdl))
+```
+
+\subsection*{Hidden Extrapolation}
+
+I talked about this briefly in last weeks tutorial. This week we'll compute a
+metric known as the regressor variable hull (RVH) which will allow us to check 
+whether or not a new data point of interest lies within the initial design.
+
+First we compute the hat matrix and save the largest diagonal element as 
+$h_max$.
+
+```{r}
+X <- cbind(rep(1, nrow(auto_mpg)), auto_mpg$wt, auto_mpg$hp, auto_mpg$disp)
+H <-  X %*% solve(t(X) %*% X) %*% t(X)
+(h_max <- max(diag(H)))
+```
+Now we will define a new point $x_0$ and check it's location relative to the
+RVH.
+\begin{align*}
+  \boldsymbol{x}_0'(\boldsymbol{X}'\boldsymbol{X})^{-1}\boldsymbol{x}_0 
+  \leq h_max
+\end{align*}
+
+```{r}
+x_0 <- data.frame(wt = 2500, hp = 150, disp = 300)
+x_0 <- as.matrix(cbind(1, x_0), nrow = 1)
+(h_00 <- x_0 %*% solve(t(X) %*% X) %*% t(x_0))
+```
+
+Since `r h_00` $<$ `r h_max`, we conclude that the new data point would fall 
+under interpolation and is safe to make a prediction at given our current model.
+
+
+\subsection*{Standardized Regression Coefficients}
+
+The purpose of standardizing the regression coefficients is to allow us to more 
+directly compare the effects of each individual predictor on the response. To do 
+do this we will scale the data. I will be doing unit normal scaling, but the
+steps used here will be the same for every type of scaling.
+
+Unit normal scalling essentially turns all variables in the data to a zero-mean
+normal variable with unit variance
+\begin{align*}
+  z_{ij} = \frac{x_{ij} - \bar{x}_j}{s_j}
+\end{align*}
+
+A useful function that we could is \verb|apply()|. It allows to apply a 
+function, \verb|FUN| to a dataframe or matrix for each of its rows or columns.
+If we want to apply the function across columns we set the second argument equal
+to 2, otherwise setting equal to 1 will apply the function to the rows. This 
+allow us to compute the means and standard deviations all variables in one line.
+```{r}
+auto_means <- apply(auto_mpg, 2, FUN = mean)
+auto_sds <- apply(auto_mpg, 2, FUN = sd)
+```
+
+We could then use this to scale the data manually, but there's another useful
+function \verb|scale()| which will do this type of scaling for us. To ensure 
+that the output is in the right format I wrap this function  in
+\verb|as.data.frame()|. 
+```{r}
+auto_scaled <- as.data.frame(scale(auto_mpg, center = TRUE, scale = TRUE))
+```
+As a check, we can make sure the means of each column in the data are zero:
+```{r}
+apply(auto_scaled, 2, FUN = mean)
+```
+and that their standard deviations are one:
+```{r}
+apply(auto_scaled, 2, FUN = sd)
+```
+
+So, we have our scaled data and can now fit a new linear regression model on 
+this data, remembering to remove the intercept from the model.
+```{r}
+mdl_scaled <- lm(mpg ~ -1 + wt + hp + disp, data = auto_scaled)
+(mdl_scaled_sum <- summary(mdl_scaled))
+```
+With this we can more easily compare the effect of each predictor on the 
+response, remembering that these effect are dependent on the other regressors
+being included in the model.
+
+
+\subsection*{Multicollinearity}
+
+This was alluded to in last weeks tutorial - in the pairs plot we saw that was
+a near linear relationship between some of the regressor variables in the
+data, e.g. between hp and disp as seen below.
+```{r, echo=FALSE}
+plot(hp ~ disp, data = auto_mpg)
+```
+The presence of multicollinearity can affect our ability to estimate the 
+coefficients in the model. Sometimes a visual check like above is enough, but 
+a diagnostic is always nice to have - we'll use the variance inflation factor (VIF):
+\begin{align*}
+  VIF_j = \frac{1}{1 - R_j^2}.
+\end{align*}
+Here $R_j^2$ is the coefficient of determination for a linear regression model
+fit with $\boldsymbol{x}_j$ as the response and the other regression variables
+as the predictors.
+
+Below I calculate the VIF for each predictor in our initial model:
+```{r}
+wt_mdl <- lm(wt ~ hp + disp, data = auto_mpg)
+wt_sum <- summary(wt_mdl)
+wt_vif <- 1/(1-wt_sum$r.squared)
+
+
+hp_mdl <- lm(hp ~ wt + disp, data = auto_mpg)
+hp_sum <- summary(hp_mdl)
+hp_vif <- 1/(1-hp_sum$r.squared)
+
+disp_mdl <- lm(disp ~ wt + hp, data = auto_mpg)
+disp_sum <- summary(disp_mdl)
+disp_vif <- 1/(1-disp_sum$r.squared)
+
+c(wt_vif, hp_vif, disp_vif)
+```
+
+Your textbook suggests VIF values larger than 10 are a serious issue. For our 
+data we see that the VIF for disp is slightly larger than 10 and therefore a 
+problem. Chapter 9 covers how to deal with multicollinearity in the data.
+
+
+\section*{Model Assessment}
+
+In this section we'll will be assessing whether or not the modelling assumptions
+are met. Those assumptions are:
+\begin{enumerate}
+  \item The response in linearly related to the predictors.
+  \item The errors are i.i.d. normally distributed, with zero mean and constant
+        variance.
+\end{enumerate}
+
+\subsection*{Residual Analysis}
+
+Today will be going over graphic analysis of the residuals to check the parts of 
+assumption 2 above, as well as any unusual observations. With this type of
+analysis it is important not to read too much into what you see, e.g. in one of
+the following plots the location of one or two points should not change our
+perception, we want to point out only obvious deviations from the assumptions. 
+
+Remember: the residual is defined to be the difference between the true response 
+value and the predicted value from the model, $e = y_i - \hat{y}_i$. In R we can 
+get residual plots simply by plotting the model object.
+```{r}
+par(mfrow = c(2, 2))
+plot(mdl)
+```
+
+
+\subsubsection*{Residuals vs. Fitted}
+First we'll look at the residuals versus fitted values plot. With this plot we 
+want to look for any pattern in the data. Ideally, we should see points 
+distributed around zero, with the same variance throughout the whole space.
+```{r}
+plot(mdl, which = 1)
+```
+Looking at the plot above, our model seems to be adequate with respect to the
+linear relationship assumption. There does seem to be a light nonlinearity, but 
+again, we only want to point out obvious deviations.
+
+When looking at the variance of the residuals, it's important to keep in mind
+the number of data points in each part of the plot. Here on the right we have 
+quite a bit more data than on the left, so we don't want to read too far into 
+the appearance of more variation in the residuals on the right than on the left. 
+It could be that if we had a few more data points whose fitted values are less 
+than 20 that the variation would appear even out. We can corroborate our
+conclusion from this plot with the scale-location plot.
+
+\subsubsection*{Normal Q-Q}
+Now, we'll look at the Normal Q-Q (quantile-quantile) plot to check the
+normality of errors assumption. Ideally the points should fall on the straight 
+dotted line.
+```{r}
+plot(mdl, which = 2)
+```
+Here we observe that for our model the residuals do adequately meet the 
+normality assumption. The deviation seen on the right of this plot suggest a
+slight positive skew to the distribution of the residuals, but it is not large
+enough to be of concern.
+
+
+\subsubsection*{Scale-Location}
+Next we look at the scale-location plot. This is used to check that the 
+residuals display equal variance along the model plane. With this plot we want
+to see a horizontal line with points evenly spread above and below it.
+```{r}
+plot(mdl, which = 3)
+```
+So, for our model this plot looks pretty good. Again there seems to be less
+variation on the left, but there is also less data so we say the  assumption of
+constant variance is met.
+
+\subsubsection*{Residuals vs. Leverage}
+Now, we look at the residuals vs. leverage plot. This is used to find 
+influential observations in the dataset, i.e. an observation that, if removed,
+will have a great affect on our fit model. Influential points may or may not be
+outliers, there are other ways to check for outliers, though this is a useful
+plot to identify possible outliers.
+
+Influential points will appear outside of Cooks Distance line marked by the
+dotted red line.
+```{r}
+plot(mdl, which = 5)
+```
+For our model we see that none of the points in our dataset has high leverage.
+
+
+\subsubsection*{Residual vs. Index}
+
+This last plot with residuals on the y-axis and their index on the x-axis allows us to check for correlation between the residuals. Again 
+here we want to to see an even scattering around $e=0$
+```{r}
+plot(mdl$residuals)
+```
+So, for our model we do get somewhat of an even scattering, though there is a slight rise in the value after the 200th residual.
+
+We can also plot succesive pairs of residuals. With this plot we would like to see a "shotgun blast", indicating there is no correlation.
+```{r}
+n <- nrow(auto_mpg)
+plot(mdl$residuals[1:(n-1)], mdl$residuals[2:n])
+```
+Here we see that the points are scattered throughout the space. There does seem 
+to be a very slight positive correlation between the residuals here but I don't 
+think we need to worry about it. There are tests that allow us to check for the 
+significance of this correlation which we will get into in future tutorials.
+
+\subsection*{Final Remarks}
+
+In this tutorial we went over some common issues with multiple regression 
+models, followed by graphical methods to asses the model. I added an extra
+regressor to our regression model from last week. When consideringthe predictors
+in the model we found that there was some issue with multicollinearity 
+between regressors. Through residual analysis we concluded that the model 
+assumptions were  approximately met, but there are some questions; this is 
+likely due to the presence of multicollinearity. In the coming tutorials we will 
+cover how to deal with these issues, along with what to do when model
+assumtpions are not met.
