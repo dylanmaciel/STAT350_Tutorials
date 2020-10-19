@@ -1,0 +1,152 @@
+---
+title: "STAT350 Tutorial 6"
+# author: "Dylan Maciel"
+date: "13/10/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+This week's tutorial will cover diagnostics for leverage and influence. This is 
+an extension to what we covered in previous tutorials with regards to 
+outliers (observations with unusual response values) and residual analysis, in 
+that we will be looking at the data we have for points that effect our model.
+
+We will be using a different dataset this week; the savings data from the 
+\verb|faraway| package which includes per capita financial information for 50 
+countries.
+```{r}
+library(faraway)
+data(savings)
+head(savings)
+```
+
+In this dataset \verb|sr| is the response and respresents the ratio of savings 
+to disposable income, \verb|dpi| is the disposable income, \verb|ddpi| is the 
+rate of change for diposable income, and \verb|pop15| and \verb|pop75| represent
+the percentage of the population which are below the age of 15 and above the age 
+of 75 respectively.
+
+I'm now going to fit the multiple linear regression model with all four
+predictors included. Here using \verb|.| to the right of the \verb|~| tells R to 
+use all other variables in the model.
+```{r}
+mdl <- lm(sr ~ ., data = savings)
+(mdl_sum <- summary(mdl))
+```
+
+So, everything looks good in the model summary -- now we'll check assumptions 
+
+
+```{r, echo = FALSE, fig.height = 3}
+par(mfrow = c(1, 2))
+plot(mdl, which = c(1,2))
+```
+
+```{r, echo = FALSE, fig.height = 3}
+par(mfrow = c(1, 2))
+plot(mdl, which = c(3,5))
+```
+
+From the first plot we can see that the linear assumption is met. The second 
+plot shows us that the normality of errors assumption is met. The third along 
+with the first plot allow us to say that the constant variance assumption is
+met. Lastly, from the below residuals versus index plot we see that the
+uncorrelated errors assumption is met. 
+
+```{r, echo = FALSE, fig.height=3.4, fig.width=5, fig.align='center'}
+plot(mdl$residuals, ylab = 'Residuals')
+```
+As for unusual points, Zambia and Chile should be checked due to their relatively 
+large residuals. And, Libya should be checked due to it's high leverage (we'll 
+go more into this in the next section).
+
+\subsection*{Leverage}
+
+The leverage of a point is define by it's place in the design space; a point far
+from all others can have a great effect on the properties of a given regression 
+model. Leverages, $h_{ii}$, are given by the diagonal elements of the hat 
+matrix: 
+\begin{align*}
+  \boldsymbol{H} = \boldsymbol{X} (\boldsymbol{X}'\boldsymbol{X})^{-1}  
+  \boldsymbol{X}.
+\end{align*}
+A common rule given is that points who's leverage exceed $2p/n$ should be looked 
+at more closely, where $n$ is the number of data points and $p$ is the number of
+coefficients in the model. For our dataset that value is:
+```{r}
+2*ncol(savings)/nrow(savings)
+```
+
+A quick way to get the influences of points in R is with the \verb|influence()| 
+function, using the model object as it's only argument. The \verb|hat| component 
+of the resulting object gives us the diagonal of the hat matrix.
+```{r}
+mdl_inf <- influence(mdl)
+sort(mdl_inf$hat, decreasing = TRUE)
+```
+So, Libya, the US, Japan, and Ireland have leverages higher than 0.2 and should 
+be looked at closer as they have the potential to be influential. Typically a
+point which has high leverage paired with a large residual it is likely to be
+influential. None of these countries had large residuals, so we'll have to dig a 
+little more.
+
+The \verb|halfnorm()| function of the \verb|faraway| package provides a useful
+way to visualize these leverages.
+```{r, fig.height=3.4, fig.width=5, fig.align='center'}
+halfnorm(mdl_inf$hat, labs = names(mdl_inf$hat), ylab = 'Leverage')
+```
+
+
+
+\subsection*{Influence}
+
+Influential points in the data are points that if removed would cause noteworthy 
+changes in the estimates of the model coefficients. They typically have large
+leverages paired with unusual response values, therefore giving it more say in 
+the fitted model values compared to other points. 
+
+\subsubsection*{Cook's Distance}
+
+Cook's distance is a measure of the distance between predicted values between
+models fit with and without point $i$. Your textbook says points with $D_i > 1$
+are considered to be influential.
+
+\begin{align*}
+  D_i = \frac{r_i^2}{p}\frac{h_{ii}}{1 - h_{ii}}
+\end{align*}
+
+Now, I'll calculate the cook's distance for our model using the 
+\verb|cooks.distance()| function with the model object as it's only argument. 
+```{r}
+mdl_cook <- cooks.distance(mdl)
+sort(mdl_cook, decreasing = TRUE)
+```
+
+So, we see that for our data and model we don't get any $D_i$ larger than 1, 
+with Libya having the greatest value at 0.268. 
+
+How does the model change if we delete Libya from the data set?
+```{r}
+mdl_lib <- lm(sr ~ ., savings, subset = (row.names(savings) != 'Libya'))
+summary(mdl_lib)
+```
+Here's the original model summary:
+```{r, echo = FALSE}
+mdl_sum
+```
+So, the biggest difference I see is in the coefficient for \verb|ddpi|, changing 
+from 0.41 to 0.61 -- quite the change considering the magnitude of the 
+coefficient.
+
+\subsection*{So, what do we do with these points?}
+
+The answer to this question is heavily dependent on context and similar to how 
+we treat outliers. That is, if we know the point is influential due to 
+experimental error it is safe to delete the point. Otherwise we should leave it 
+in. There are methods of regression that are less susceptible to changes caused
+by the presence of influential points.
