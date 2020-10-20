@@ -1,0 +1,46 @@
+---
+title: "STAT350 Tutorial 7"
+# author: "Dylan Maciel"
+date: "20/10/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+
+This weeks tutorial is going to be relatively short as we've already covered 
+most topics necessary for assignment 4. 
+
+\subsection*{Power of a Staistical Test}
+
+The power of a test is defined to be 
+\begin{align*}
+  Power = 1 - \beta = 1 - P(\text{Type II Error}),
+\end{align*}
+where type II error occurs when the null hypothesis is not rejected given the 
+alternative is true. Or, The probability that rejecting the null hypothesis is
+the correct choice.
+
+What this comes down to is comparing two distributions: 
+the distribution under the null hypothesis to the true distribution of the 
+quantity of interest. Looking at the figure below we see that the power of a 
+test depends on the overlap of these two distributions. When performing a
+hypothesis test we set a level $\alpha$ with respect to the distribution under
+the null hypothesis, then compute the corresponding critical value -- this is 
+the point where we consider the overlap. 
+
+
+![Power of a test as comparing the overlap between two distributions. (Taken from https://www.real-statistics.com/sampling-distributions/statistical-power-sample/)](C:\Users\dylan\Desktop\STAT 350 Stuff\statistical-power-chart.png){width=40%}
+
+
+Given the critical value, there are two main things that affect the power of the 
+hypothesis test: the true value of the quantity of interest and the sample size. 
+As to the former, the farther away the true value from the hypothesized 
+value, resulting in a lower probability of type II error and our test having 
+higher power. Sample size affects the power of the test through it's effect on 
+the variance of the sampling distribution for the quantity of interest.
+Increasing the sample size results in increased power of the hypothesis test.
