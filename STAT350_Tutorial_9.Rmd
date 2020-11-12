@@ -1,0 +1,146 @@
+---
+title: "STAT350 Tutorial 9"
+author: "Dylan Maciel"
+date: "3/11/2020"
+linestretch: 1.5
+urlcolor: blue
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+``` 
+
+
+In this week's tutorial we'll be covering model selection. Until now, our 
+approach has been to choose our model and run with it; the regressors were 
+chosen at the beginning of the process and in the end we checked if our model 
+was adequate with respect to prediction accuracy, model assumptions, etc. 
+Sometimes the best model only includes a subset of the available predictors.
+There are many ways to approach finding this model (approximately). So far 
+you've been introduced to forward selection, backward elimination, and stepwise 
+regression through a few types of selection criteria: the coefficient of 
+multiple determination, residual mean square, Mallow's $C_p$ Statistic, Akaike 
+information criteria (AIC), and Bayesian information criteria (BIC).
+
+
+By choosing a "best" subset of predictors we come up to significant topic in
+statistics: the bias-variance trade-off. Recall what happens to a sampling 
+distribution when we increase the sample size -- the variance decreases. So, for
+a given sample of data, a model witho nly a few parameters to estimate will have 
+low variance and as we increase the  number of parameters the variance of their 
+estimates will increase. 
+
+
+But how does this affect the accuracy of the model\? If there are too few (or 
+non-ideal) predictors in our model it will have high bias and as we include more 
+predictors, we lower the bias by capturing relevant relationships in the data.
+
+
+We care about bias and variance as they contribute the error in the model. This 
+is summed up in the figure below, where we see there is an ideal balance between 
+the bias and the variance present in the model which will lead to the minimum 
+total error in the model. We want to find the simplest model that fits the data 
+well.
+
+
+![Bias-variance trade-off and the effect on error. (Taken from https://stats.stackexchange.com/questions/336433/bias-variance-tradeoff-math)](C:\Users\dylan\Desktop\STAT 350 Stuff\bias_var_trade.png){height=15%}
+
+
+\subsection*{Stepwise Regression using AIC}
+
+I'll be going through a variable selection example with the U.S. census data 
+found in the faraway package. We'll be predicting life expectancy 
+(\verb|Life.Exp|) given some numerical descriptors of the state, there are 7. 
+```{r}
+library(faraway)
+data(state)
+state_data <- data.frame(state.x77, row.names = state.abb)
+head(state_data)
+```
+
+Before going through the procedure I'll introduce the criterion we'll be using:
+\begin{align*}
+  AIC = -2 \ln(\mathcal{L}) + 2p.
+\end{align*}
+Conveniently, in the OLS setting this simplifies to 
+\begin{align*}
+  AIC = -2 \ln\bigg(\frac{SS_{RES}}{n}\bigg) + 2p.
+\end{align*}
+This criterion comes from information theory and tells us how well the model 
+fits the data while trying to prevent over-fitting; we always compare AIC values 
+between models. In the second equation above, we see that AIC does this by 
+balancing the amount of residual error (the first term) with the amount of 
+predictors included in the model (the second term); remember adding a predictor 
+will never increase the residual error. We want to find the model with minimum 
+AIC.
+
+With the stepwise procedure we can start with the full model or a model with a 
+single predictor. At each step, the AIC of models that are one included or 
+excluded predictor away are computed and compared to the current model. If one 
+or more of the proposed models reduces AIC, we proceed with the one that has 
+minimum AIC and take another step. Otherwise, the current  model is the final 
+model and we stop.
+
+
+\newpage
+To do this in \verb|R| we'll first fit the full model with all predictors.
+```{r}
+state_mdl <- lm(Life.Exp ~ ., data = state_data)
+```
+
+Next, we apply the \verb|step()| function to the model object. An important 
+argument is \verb|direction| which can be set to 'forward', 'backward', or 
+'both' (stepwise). The default criteria for this function is AIC, so this 
+combined with the direction specifies the variable selection procedure.
+
+```{r}
+step(state_mdl, direction = 'both')
+```
+
+The \verb|step()| function returns all the intermediate models. Each step begins 
+with the AIC of the current model and shows the resicual error and AIC of the 
+possible models for the next step. If a variable has a \verb|-| the AIC reported 
+is for the model with that variable removed. Similarly, a \verb|+| indicates a 
+model with that variable added.  The \verb|<none>| row is the row that 
+corresponds to the current model. Another thing you'll notice in the output; 
+models with minimum RSS don't necessarily have minimum AIC. 
+
+
+For our example we get a final model that has four of the seven possible 
+predictors. Interestingly, we never took a forward step to get to this model; 
+only backward eliminations. A couple comments about the path; (1) if we were to 
+transform the variables before doing variable selection it's likely the path 
+would change (you should check for this with the full model beforehand), (2) 
+different criteria can lead to different paths. These methods are more guides 
+rather than set in stone conclusions; knowledge of the data and it's topic 
+should always be taken into consideration. Figure 10.11 in your text provides a 
+flowchart to guide you in the process.
+
+
+If we wanted to use the BIC, given by
+\begin{align*}
+  BIC = -2 \log(\mathcal{L}) + p\ln(n),
+\end{align*}
+we could simply use the AIC values given, subtract $2p$, then add $p\ln(n)$. 
+With the \verb|step()| function we can set $k = log(n)$ to use BIC values in 
+selection. BIC places more weight on the second term (if $n>7$), and therefore 
+prefers models with less parameters when compared to AIC. If you want to use 
+other criteria I recommend you have a look at the \verb|regsubsets()| function 
+found in the \verb|leaps| package. 
+
+
+To perform the variable selection procedures with hypothesis tests you'll be 
+looking at the summary of the \verb|lm| objects. These contain the p-values 
+associated with the conditional t-tests for each predictor. \verb|update()| is a 
+useful function which allows you to change a \verb|lm()| object without creating
+a new one. So, if we start with our full  model:
+```{r, echo=FALSE}
+state_mdl
+```
+And, now I'll remove the predictor \verb|Area| with the following code:
+```{r}
+update(state_mdl, . ~ . - Area)
+```
+This way you don't have to define new linear model at each step of the variable 
+selection process.
