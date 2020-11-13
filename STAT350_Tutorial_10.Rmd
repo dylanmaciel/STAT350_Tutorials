@@ -129,9 +129,31 @@ mdl_full <- lm(ptsd ~ cpa*csa, data = sexab)
 summary(mdl_full)
 ```
 
-The first thing to notice in the model summary is that the interaction term is insignificant. So, we'll fit a model without it.
+The first thing to notice in the model summary is that the interaction term is insignificant, i.e. we reject the hypo. So, we'll fit a model without it.
 ```{r}
 mdl_add <- lm(ptsd ~ cpa + csa, data = sexab)
 summary(mdl_add)
 ```
 
+We can use an ANOVA to test the null hypothesis if that there is no difference between the above models. This is how you would get the F-statistic for comparing the full modelto any model nested within it.
+```{r}
+anova(mdl_full, mdl_add)
+```
+So, we fail to reject the null and conclude that there is no difference. 
+
+
+We can plot the stratified regression lines from this model:
+```{r}
+ggplot() +
+  theme_bw() +
+  theme(legend.position = c(0.1, 0.85)) +
+  geom_point(aes(x = cpa, y = ptsd, col = csa), sexab, size = 2) +
+  geom_abline(aes(slope = mdl_add$coefficients[2], 
+                  intercept = mdl_add$coefficients[1], 
+                  col = 'NotAbused'),
+              size = 1.5) +
+  geom_abline(aes(slope = mdl_add$coefficients[2], 
+                  intercept = mdl_add$coefficients[1] + mdl_add$coefficients[3], 
+                  col = 'Abused'),
+              size = 1.5)
+```
