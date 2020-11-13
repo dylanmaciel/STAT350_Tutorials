@@ -162,7 +162,7 @@ We can plot the stratified regression lines from this model:
 ```{r, echo=FALSE, fig.height=4, fig.width=5.5, fig.align='center'}
 ggplot() +
   theme_bw() +
-  theme(legend.position = c(0.1, 0.85)) +
+  theme(legend.position = c(0.125, 0.85)) +
   geom_point(aes(x = cpa, y = ptsd, col = csa), sexab, size = 2) +
   geom_abline(aes(slope = mdl_add$coefficients[2], 
                   intercept = mdl_add$coefficients[1], 
