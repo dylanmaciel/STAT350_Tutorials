@@ -1,7 +1,7 @@
 ---
-title: "STAT350 Tutorial 9"
+title: "STAT350 Tutorial 10"
 author: "Dylan Maciel"
-date: "3/11/2020"
+date: "13/11/2020"
 linestretch: 1.5
 urlcolor: blue
 output: pdf_document
@@ -86,7 +86,8 @@ plots with \verb|ggplot|.
 First, we have boxplots for \verb|ptsd| given fir the levels of \verb|csa|. Here
 there seems to be a difference between the two groups; we'll test this 
 hypothesis later.
-```{r, echo=FALSE}
+
+```{r, echo=FALSE, message=FALSE, fig.height=4, fig.width=5.5, fig.align='center'}
 library(tidyverse)
 ggplot(sexab) +
   theme_bw() +
@@ -96,34 +97,48 @@ ggplot(sexab) +
 
 Next, we have a scatter plot for \verb|ptsd| given \verb|cpa| where we have set 
 the colour to indicate the level of \verb|csa|.
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.height=4, fig.width=5.5, fig.align='center'}
 ggplot(sexab) +
   theme_bw() +
-  theme(legend.position = c(0.1, 0.85)) +
+  theme(legend.position = c(0.125, 0.85)) +
   geom_point(aes(x = cpa, y = ptsd, col = csa), size = 2)
 ```
+
+\newpage
 Here there does seem to be a weak linear relationship between \verb|cpa| and 
 \verb|ptsd| and there we also see a stratification where those who were abused 
 have higher levels of \verb|ptsd|. You may remember from previous classes that 
 you can test the hypothesis for a difference using a t-test.
 
-Next I'll show you how to code dummy variables. We don't actually need to do tis for our dataset as there is only one binary predictor, but you may need this for future assignments. I'll code two dummy variables, one
-for those who were sexually abused, and one for those not abused. Here I'll be using the \verb|ifelse()| function to assign new values manually. There are functions from packages that can do this automatically, like \verb|dummyVars| from the \verb|caret| package, that are useful when the number of dummy varibles you'll have is large. 
+Next I'll show you how to code dummy variables. We don't actually need to do 
+this for our dataset as there is only one binary predictor, but you may need 
+this for future assignments. I'll code two dummy variables, one for those who 
+were sexually abused, and one for those not abused. Here I'll be using the 
+\verb|ifelse()| function to assign new values manually. There are functions from 
+packages that can do this automatically, like \verb|dummyVars| from the 
+\verb|caret| package, that are useful when the number of dummy varibles you'll 
+have is large. 
 
 ```{r}
 dum1 <- ifelse(sexab$csa == 'Abused', yes = 1, no = 0)
 dum2 <- ifelse(sexab$csa == 'NotAbused', yes = 1, no = 0)
 ```
 
-IF you recall the model specification from above, the model where $x=0$ for the dummy variable is known as the reference level. The choice for this is arbitrary, but it is good practice to choose a reference level that makes sense in the context of the data. For this data the no abuse is the natural choice so I will make sure that \verb|R| uses this a the reference level through the \verb|relevel()| 
-function.
+If you recall the model specification from above, the model where $x=0$ for the 
+dummy variable is known as the reference level. The choice for this is 
+arbitrary, but it is good practice to choose a reference level that makes sense 
+in the context of the data. For this data the no abuse is the natural choice so 
+I will make sure that \verb|R| uses this a the reference level through the 
+\verb|relevel()| function.
 
 ```{r}
 sexab$csa <- relevel(sexab$csa, ref = 'NotAbused')
 ```
 
 
-Once we have are variables definde we can move onto fitting the model. First, we'll fit the full model with interaction. Notice on the right of the \verb|~| I have put \verb|cpa*csa| and the model includes four coefficients.
+Once we have are variables definde we can move onto fitting the model. First, 
+we'll fit the full model with interaction. Notice on the right of the \verb|~| I 
+have put \verb|cpa*csa| and the model includes four coefficients.
 ```{r}
 mdl_full <- lm(ptsd ~ cpa*csa, data = sexab)
 summary(mdl_full)
@@ -135,15 +150,16 @@ mdl_add <- lm(ptsd ~ cpa + csa, data = sexab)
 summary(mdl_add)
 ```
 
-We can use an ANOVA to test the null hypothesis if that there is no difference between the above models. This is how you would get the F-statistic for comparing the full modelto any model nested within it.
+We can use an ANOVA to test the null hypothesis if that there is no difference 
+between the above models. This is how you would get the F-statistic for 
+comparing the full modelto any model nested within it.
 ```{r}
 anova(mdl_full, mdl_add)
 ```
 So, we fail to reject the null and conclude that there is no difference. 
 
-
 We can plot the stratified regression lines from this model:
-```{r}
+```{r, echo=FALSE, fig.height=4, fig.width=5.5, fig.align='center'}
 ggplot() +
   theme_bw() +
   theme(legend.position = c(0.1, 0.85)) +
@@ -157,3 +173,9 @@ ggplot() +
                   col = 'Abused'),
               size = 1.5)
 ```
+
+
+A quick comment about interaction terms; interpreting the effect of interaction 
+can be more straight forward when the continuous variables in the model have 
+been centered by their means. That way when we interpret the intercepts they lie 
+within the range of the observed data and are therefore more meaningful.
